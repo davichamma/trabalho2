@@ -249,15 +249,5 @@ public class Client {
 
         Client client = new Client(fileName, ipAddress, udpPort, wnd, rot, mss);
 
-        // Scanner teclado = new Scanner(System.in);
-        // System.out.println("----------------------------------------------CLIENTE-----------------------------------------------");
-        // System.out.print("Digite o endereco do servidor: ");
-        // String ipAddress = teclado.nextLine();
-        // System.out.print("Digite o diretorio do file a ser enviado. (Ex: C:/Users/Diego/Documents/): ");
-        // String diretorio = teclado.nextLine();
-        // System.out.print("Digite o nome do file a ser enviado: (Ex: letra.txt): ");
-        // String nome = teclado.nextLine();
- 
-        // Cliente cliente = new Cliente(PORTA_SERVIDOR, PORTA_ACK, diretorio + nome, ipAddress);
     }
 }
