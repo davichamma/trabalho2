@@ -31,7 +31,7 @@ public class Client {
     boolean transfer;
  
     //construtor
-    public Client(String fileName, String ipAddress, int udpPort, int wnd, int rto, int mss) {
+    public Client(String fileName, String ipAddress, int udpPort, int wnd, int mss) {
 
         base = 0;
         nextNumSeq = 0;
@@ -230,13 +230,11 @@ public class Client {
     public static void main(String[] args) {
         int udpPort = 0;
         int wnd = 0;
-        int rot = 0;
         int mss = 0;
         try {
             udpPort = Integer.parseInt(args[2]);
             wnd = Integer.parseInt(args[3]);
-            rot = Integer.parseInt(args[4]);
-            mss = Integer.parseInt(args[5]);
+            mss = Integer.parseInt(args[4]);
         }
         catch(NumberFormatException nfe) {
             System.exit(1);
@@ -244,7 +242,7 @@ public class Client {
         String fileName = args[0];
         String ipAddress = args[1];
 
-        Client client = new Client(fileName, ipAddress, udpPort, wnd, rot, mss);
+        Client client = new Client(fileName, ipAddress, udpPort, wnd, mss);
 
     }
 }
