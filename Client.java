@@ -19,10 +19,7 @@ import static java.lang.Thread.sleep;
 public class Client {
  
     static final int HEADER = 4;
-    static final int TAMANHO_PACOTE = 1000;  // (numSeq:4, dados=1000) Bytes : 1004 Bytes total
-    static final int TAMANHO_JANELA = 10;
     static final int TIMER_VALUE = 1000;
-    static final int PORTA_SERVIDOR = 8002;
     static final int ACK_PORT = 8003;
 
     int base;    // numero da janela
@@ -39,11 +36,11 @@ public class Client {
         base = 0;
         nextNumSeq = 0;
         this.path =  "./" + fileName;
-        packageList = new ArrayList<>(wnd); //TAMANHO janel
+        packageList = new ArrayList<>(wnd); 
         transfer = false;
         DatagramSocket outSocket, inSocket;
         light = new Semaphore(1);
-        System.out.println("Cliente: porta de destino: " + udpPort + ", porta de entrada: " + ACK_PORT + ", path: " + path);
+        System.out.println("Cliente: porta de destino: " + udpPort + ", arquivo: " + path);
  
         try {
             //criando sockets
@@ -69,7 +66,7 @@ public class Client {
             try {
                 light.acquire();
                 System.out.println("Cliente: Tempo expirado!");
-                nextNumSeq = base;  //reseta numero de sequencia
+                nextNumSeq = base;
                 light.release();
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -84,7 +81,7 @@ public class Client {
         }
         if (newTimer) {
             timer = new Timer();
-            timer.schedule(new Timeout(), TIMER_VALUE); //valor timer
+            timer.schedule(new Timeout(), TIMER_VALUE);
         }
     }
  
@@ -122,7 +119,7 @@ public class Client {
  
                 try {
                     while (!transfer) {    //envia pacotes se a janela nao estiver cheia
-                        if (nextNumSeq < base + (wnd *  mss)) { //tamanho janela * tamanho pacote
+                        if (nextNumSeq < base + (wnd *  mss)) { 
                             light.acquire();
                             if (base == nextNumSeq) {   //se for primeiro pacote da janela, inicia Timer
                                 handleTimer(true);
@@ -133,8 +130,8 @@ public class Client {
                             if (nextNumSeq < packageList.size()) {
                                 sentData = packageList.get(nextNumSeq);
                             } else {
-                                byte[] dataBuffer = new byte[mss]; //tamanho pacote
-                                int dataSize = fis.read(dataBuffer, 0, mss); //tamanho pacote
+                                byte[] dataBuffer = new byte[mss]; 
+                                int dataSize = fis.read(dataBuffer, 0, mss); 
                                 if (dataSize == -1) {   //sem dados para enviar, envia pacote vazio 
                                     lastNumSeq = true;
                                     sentData = generatePackage(nextNumSeq, new byte[0]);
@@ -198,7 +195,7 @@ public class Client {
                         int numAck = getnumAck(receiveData);
                         System.out.println("Cliente: Ack recebido " + numAck);
                         //se for ACK duplicado
-                        if (base == numAck + mss) { //tamanho pacote
+                        if (base == numAck + mss) { 
                             light.acquire();
                             handleTimer(false);
                             nextNumSeq = base;
@@ -207,7 +204,7 @@ public class Client {
                             transfer = true;
                         } //ACK normal
                         else {
-                            base = numAck + mss; //tamanho pacote
+                            base = numAck + mss; 
                             light.acquire();
                             if (base == nextNumSeq) {
                                 handleTimer(false);

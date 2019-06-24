@@ -51,13 +51,13 @@ public class Server {
                     if (numSeq == nextNumSeq) {
                         //se for ultimo pacote (sem dados), enviar ack de encerramento
                         if (receivePackage.getLength() == HEADER) {
-                            byte[] ackPackage = gerarPacote(-2);     //ack de encerramento
+                            byte[] ackPackage = generatePackege(-2);     //ack de encerramento
                             outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                             transfer = true;
                             System.out.println("Servidor: Todos pacotes foram recebidos! file criado!");
                         } else {
                             nextNumSeq = numSeq + TAMANHO_PACOTE - HEADER;  //atualiza proximo numero de sequencia
-                            byte[] ackPackage = gerarPacote(nextNumSeq);
+                            byte[] ackPackage = generatePackege(nextNumSeq);
                                 outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                                 System.out.println("Servidor: Ack enviado " + nextNumSeq);
                           }
@@ -76,7 +76,7 @@ public class Server {
  
                         lastNumSeq = numSeq; //atualiza o ultimo numero de sequencia enviado
                     } else {    //se pacote estiver fora de ordem, mandar duplicado
-                        byte[] ackPackage = gerarPacote(lastNumSeq);
+                        byte[] ackPackage = generatePackege(lastNumSeq);
                         outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                         System.out.println("Servidor: Ack duplicado enviado " + lastNumSeq);
                     }
@@ -101,7 +101,7 @@ public class Server {
     //fim do construtor
  
     //gerar pacote de ACK
-    public byte[] gerarPacote(int numAck) {
+    public byte[] generatePackege(int numAck) {
         byte[] numAckBytes = ByteBuffer.allocate(HEADER).putInt(numAck).array();
         ByteBuffer packageBuffer = ByteBuffer.allocate(HEADER);
         packageBuffer.put(numAckBytes);
