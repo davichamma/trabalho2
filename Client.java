@@ -1,10 +1,5 @@
 package trabalhoredes;
 
-/**
- * @authors Catarina Ribeiro, Leonardo Cavalcante, Leonardo Portugal, Victor
- * Meireles
- *
- */
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.DatagramPacket;
@@ -26,10 +21,10 @@ public class Client {
     static final int HEADER = 4;
     static final int TAMANHO_PACOTE = 1000;  // (numSeq:4, dados=1000) Bytes : 1004 Bytes total
     static final int TAMANHO_JANELA = 10;
-    static final int VALOR_TIMER = 1000;
+    static final int TIMER_VALUE = 1000;
     static final int PORTA_SERVIDOR = 8002;
-    static final int PORTA_ACK = 8003;
- 
+    static final int ACK_PORT = 8003;
+
     int base;    // numero da janela
     int nextNumSeq;   //proximo numero de sequencia na janela
     String path;     //diretorio + nome do file
@@ -39,26 +34,25 @@ public class Client {
     boolean transfer;
  
     //construtor
-    public Client(String fileName, String ipAddress, ing udpPort)
+    public Client(String fileName, String ipAddress, int udpPort, int wnd, int rto, int mss) {
 
-    public Cliente(int outPort, int inPort, String path, String ipAddress) {
         base = 0;
         nextNumSeq = 0;
-        this.path = path;
-        packageList = new ArrayList<>(TAMANHO_JANELA);
+        this.path =  "./" + fileName;
+        packageList = new ArrayList<>(wnd); //TAMANHO janel
         transfer = false;
         DatagramSocket outSocket, inSocket;
         light = new Semaphore(1);
-        System.out.println("Cliente: porta de destino: " + outPort + ", porta de entrada: " + inPort + ", path: " + path);
+        System.out.println("Cliente: porta de destino: " + udpPort + ", porta de entrada: " + ACK_PORT + ", path: " + path);
  
         try {
             //criando sockets
             outSocket = new DatagramSocket();
-            inSocket = new DatagramSocket(inPort);
+            inSocket = new DatagramSocket(ACK_PORT);
  
             //criando threads para processar os dados
-            ThreadEntrada tEntrada = new ThreadEntrada(inSocket);
-            ThreadSaida tSaida = new ThreadSaida(outSocket, outPort, inPort, ipAddress);
+            ThreadEntrada tEntrada = new ThreadEntrada(inSocket, mss);
+            ThreadSaida tSaida = new ThreadSaida(outSocket, udpPort, ACK_PORT, ipAddress, mss, wnd);
             tEntrada.start();
             tSaida.start();
  
@@ -69,7 +63,7 @@ public class Client {
     }
     //fim do construtor
  
-    public class Timer extends TimerTask {
+    public class Timeout extends TimerTask {
  
         public void run() {
             try {
@@ -90,23 +84,27 @@ public class Client {
         }
         if (newTimer) {
             timer = new Timer();
-            timer.schedule(new Timer(), VALOR_TIMER);
+            timer.schedule(new Timeout(), TIMER_VALUE); //valor timer
         }
     }
  
     public class ThreadSaida extends Thread {
  
         private DatagramSocket outSocket;
-        private int outPort;
+        private int udpPort;
         private InetAddress ipAddress;
-        private int inPort;
+        private int ACK_PORT;
+        private int mss;
+        private int wnd;
  
         //construtor
-        public ThreadSaida(DatagramSocket outSocket, int outPort, int inPort, String ipAddress) throws UnknownHostException {
+        public ThreadSaida(DatagramSocket outSocket, int udpPort, int ACK_PORT, String ipAddress, int mss, int wnd) throws UnknownHostException {
             this.outSocket = outSocket;
-            this.outPort = outPort;
-            this.inPort = inPort;
+            this.udpPort = udpPort;
+            this.ACK_PORT = ACK_PORT;
             this.ipAddress = InetAddress.getByName(ipAddress);
+            this.mss = mss;
+            this.wnd = wnd;
         }
  
         //cria o pacote com numero de sequencia e os dados
@@ -124,7 +122,7 @@ public class Client {
  
                 try {
                     while (!transfer) {    //envia pacotes se a janela nao estiver cheia
-                        if (nextNumSeq < base + (TAMANHO_JANELA * TAMANHO_PACOTE)) {
+                        if (nextNumSeq < base + (wnd *  mss)) { //tamanho janela * tamanho pacote
                             light.acquire();
                             if (base == nextNumSeq) {   //se for primeiro pacote da janela, inicia Timer
                                 handleTimer(true);
@@ -135,8 +133,8 @@ public class Client {
                             if (nextNumSeq < packageList.size()) {
                                 sentData = packageList.get(nextNumSeq);
                             } else {
-                                byte[] dataBuffer = new byte[TAMANHO_PACOTE];
-                                int dataSize = fis.read(dataBuffer, 0, TAMANHO_PACOTE);
+                                byte[] dataBuffer = new byte[mss]; //tamanho pacote
+                                int dataSize = fis.read(dataBuffer, 0, mss); //tamanho pacote
                                 if (dataSize == -1) {   //sem dados para enviar, envia pacote vazio 
                                     lastNumSeq = true;
                                     sentData = generatePackage(nextNumSeq, new byte[0]);
@@ -147,12 +145,12 @@ public class Client {
                                 packageList.add(sentData);
                             }
                             //enviando pacotes
-                            outSocket.send(new DatagramPacket(sentData, sentData.length, ipAddress, outPort));
+                            outSocket.send(new DatagramPacket(sentData, sentData.length, ipAddress, udpPort));
                             System.out.println("Cliente: Numero de sequencia enviado " + nextNumSeq);
  
                             //atualiza numero de sequencia se nao estiver no fim
                             if (!lastNumSeq) {
-                                nextNumSeq += TAMANHO_PACOTE;
+                                nextNumSeq += mss; //tamanho pacote
                             }
                             light.release();
                         }
@@ -176,10 +174,12 @@ public class Client {
     public class ThreadEntrada extends Thread {
  
         private DatagramSocket inSocket;
+        private int mss;
  
         //construtor
-        public ThreadEntrada(DatagramSocket inSocket) {
+        public ThreadEntrada(DatagramSocket inSocket, int mss) {
             this.inSocket = inSocket;
+            this.mss = mss;
         }
  
         //retorna ACK
@@ -198,7 +198,7 @@ public class Client {
                         int numAck = getnumAck(receiveData);
                         System.out.println("Cliente: Ack recebido " + numAck);
                         //se for ACK duplicado
-                        if (base == numAck + TAMANHO_PACOTE) {
+                        if (base == numAck + mss) { //tamanho pacote
                             light.acquire();
                             handleTimer(false);
                             nextNumSeq = base;
@@ -207,7 +207,7 @@ public class Client {
                             transfer = true;
                         } //ACK normal
                         else {
-                            base = numAck + TAMANHO_PACOTE;
+                            base = numAck + mss; //tamanho pacote
                             light.acquire();
                             if (base == nextNumSeq) {
                                 handleTimer(false);
@@ -231,25 +231,33 @@ public class Client {
     }
  
     public static void main(String[] args) {
-        if (args.length <= 4) {
-            throw 
+        int udpPort = 0;
+        int wnd = 0;
+        int rot = 0;
+        int mss = 0;
+        try {
+            udpPort = Integer.parseInt(args[2]);
+            wnd = Integer.parseInt(args[3]);
+            rot = Integer.parseInt(args[4]);
+            mss = Integer.parseInt(args[5]);
         }
-        //nome do file. ip, porta, tam janela, rtt, mss, dupck, lp
+        catch(NumberFormatException nfe) {
+            System.exit(1);
+        }
         String fileName = args[0];
-        ipAddress = args[1];
-        udpPort = args[2];
+        String ipAddress = args[1];
 
-        Client client = new Client(fileName, ipAddress, udpPort)
+        Client client = new Client(fileName, ipAddress, udpPort, wnd, rot, mss);
 
-        Scanner teclado = new Scanner(System.in);
-        System.out.println("----------------------------------------------CLIENTE-----------------------------------------------");
-        System.out.print("Digite o endereco do servidor: ");
-        String ipAddress = teclado.nextLine();
-        System.out.print("Digite o diretorio do file a ser enviado. (Ex: C:/Users/Diego/Documents/): ");
-        String diretorio = teclado.nextLine();
-        System.out.print("Digite o nome do file a ser enviado: (Ex: letra.txt): ");
-        String nome = teclado.nextLine();
+        // Scanner teclado = new Scanner(System.in);
+        // System.out.println("----------------------------------------------CLIENTE-----------------------------------------------");
+        // System.out.print("Digite o endereco do servidor: ");
+        // String ipAddress = teclado.nextLine();
+        // System.out.print("Digite o diretorio do file a ser enviado. (Ex: C:/Users/Diego/Documents/): ");
+        // String diretorio = teclado.nextLine();
+        // System.out.print("Digite o nome do file a ser enviado: (Ex: letra.txt): ");
+        // String nome = teclado.nextLine();
  
-        Cliente cliente = new Cliente(PORTA_SERVIDOR, PORTA_ACK, diretorio + nome, ipAddress);
+        // Cliente cliente = new Cliente(PORTA_SERVIDOR, PORTA_ACK, diretorio + nome, ipAddress);
     }
 }

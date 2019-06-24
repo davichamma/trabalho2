@@ -16,28 +16,31 @@ import java.nio.ByteBuffer;
 import java.util.Scanner;
 import java.util.Arrays;
   
-public class Servidor { 
-    static final int CABECALHO = 4;
-    static final int TAMANHO_PACOTE = 1000 + CABECALHO;
+public class Server { 
+    static final int HEADER = 4;
+    static final int TAMANHO_PACOTE = 1000 + HEADER;
     static final int PORTA_SERVIDOR = 8002;
-    static final int PORTA_ACK = 8003;
+    static final int ACK_PORT = 8003;
  
     //construtor
-    public Servidor(int inPort, int outPort, String caminho) {
+    public Server(String fn, int sport, int wnd) {
+
+
+     // public Servidor(int sport, int ACK_PORT, String caminho) {
         DatagramSocket inSocket, outSocket;
-        System.out.println("Servidor: porta de entrada: " + inPort + ", " + "porta de destino: " + outPort + ".");
+        System.out.println("Servidor: porta de entrada: " + sport + ".");
  
         int lastNumSeq = -1;
         int nextNumSeq = 0;  //proximo numero de sequencia
         boolean transfer = false;  //flag caso a transferencia nao for completa
- 
+        String path = "./" + fn;
         //criando sockets
         try {
-            inSocket = new DatagramSocket(inPort);
+            inSocket = new DatagramSocket(sport);
             outSocket = new DatagramSocket();
             System.out.println("Servidor Conectado...");
             try {
-                byte[] receiveData = new byte[TAMANHO_PACOTE];
+                byte[] receiveData = new byte[wnd + HEADER]; //tamanho pacote
                 DatagramPacket receivePackage = new DatagramPacket(receiveData, receiveData.length);
  
                 FileOutputStream fos = null;
@@ -47,40 +50,40 @@ public class Servidor {
                     inSocket.receive(receivePackage);
                     InetAddress ipAddress = receivePackage.getAddress();
  
-                    int numSeq = ByteBuffer.wrap(Arrays.copyOfRange(receiveData, 0, CABECALHO)).getInt();
+                    int numSeq = ByteBuffer.wrap(Arrays.copyOfRange(receiveData, 0, HEADER)).getInt();
                     System.out.println("Servidor: Numero de sequencia recebido " + numSeq);
  
                     //se o pacote for recebido em ordem
                     if (numSeq == nextNumSeq) {
                         //se for ultimo pacote (sem dados), enviar ack de encerramento
-                        if (receivePackage.getLength() == CABECALHO) {
+                        if (receivePackage.getLength() == HEADER) {
                             byte[] ackPackage = gerarPacote(-2);     //ack de encerramento
-                            outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, outPort));
+                            outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                             transfer = true;
                             System.out.println("Servidor: Todos pacotes foram recebidos! file criado!");
                         } else {
-                            nextNumSeq = numSeq + TAMANHO_PACOTE - CABECALHO;  //atualiza proximo numero de sequencia
+                            nextNumSeq = numSeq + TAMANHO_PACOTE - HEADER;  //atualiza proximo numero de sequencia
                             byte[] ackPackage = gerarPacote(nextNumSeq);
-                                outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, outPort));
+                                outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                                 System.out.println("Servidor: Ack enviado " + nextNumSeq);
                           }
  
                         //se for o primeiro pacote da transferencia 
                         if (numSeq == 0 && lastNumSeq == -1) {
                             //cria file    
-                            File file = new File(caminho);
+                            File file = new File(path);
                             if (!file.exists()) {
                                 file.createNewFile();
                             }
                             fos = new FileOutputStream(file);
                         }
                         //escreve dados no file
-                        fos.write(receiveData, CABECALHO, receivePackage.getLength() - CABECALHO);
+                        fos.write(receiveData, HEADER, receivePackage.getLength() - HEADER);
  
                         lastNumSeq = numSeq; //atualiza o ultimo numero de sequencia enviado
                     } else {    //se pacote estiver fora de ordem, mandar duplicado
                         byte[] ackPackage = gerarPacote(lastNumSeq);
-                        outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, outPort));
+                        outSocket.send(new DatagramPacket(ackPackage, ackPackage.length, ipAddress, ACK_PORT));
                         System.out.println("Servidor: Ack duplicado enviado " + lastNumSeq);
                     }
  
@@ -105,20 +108,34 @@ public class Servidor {
  
     //gerar pacote de ACK
     public byte[] gerarPacote(int numAck) {
-        byte[] numAckBytes = ByteBuffer.allocate(CABECALHO).putInt(numAck).array();
-        ByteBuffer packageBuffer = ByteBuffer.allocate(CABECALHO);
+        byte[] numAckBytes = ByteBuffer.allocate(HEADER).putInt(numAck).array();
+        ByteBuffer packageBuffer = ByteBuffer.allocate(HEADER);
         packageBuffer.put(numAckBytes);
         return packageBuffer.array();
     }
  
     public static void main(String[] args) {
-        Scanner teclado = new Scanner(System.in);
-        System.out.println("----------------------------------------------SERVIDOR----------------------------------------------");
-        System.out.print("Digite o diretorio do file a ser criado. (Ex: C:/Users/Diego/Documents/): ");
-        String diretorio = teclado.nextLine();
-        System.out.print("Digite o nome do file a ser criado: (Ex: letra.txt): ");
-        String nome = teclado.nextLine();
+        int udpPort = 0;
+        int wnd = 0;
+        try {
+            udpPort = Integer.parseInt(args[1]);
+            wnd = Integer.parseInt(args[2]);
+        }
+        catch(NumberFormatException nfe) {
+            System.exit(1);
+        }
+        String fileName = args[0];
+
+        Server server = new Server(fileName, udpPort, wnd);
  
-        Servidor servidor = new Servidor(PORTA_SERVIDOR, PORTA_ACK, diretorio + nome);
+
+        // Scanner teclado = new Scanner(System.in);
+        // System.out.println("----------------------------------------------SERVIDOR----------------------------------------------");
+        // System.out.print("Digite o diretorio do file a ser criado. (Ex: C:/Users/Diego/Documents/): ");
+        // String diretorio = teclado.nextLine();
+        // System.out.print("Digite o nome do file a ser criado: (Ex: letra.txt): ");
+        // String nome = teclado.nextLine();
+ 
+        // Servidor servidor = new Servidor(PORTA_SERVIDOR, PORTA_ACK, diretorio + nome);
     }
 }
